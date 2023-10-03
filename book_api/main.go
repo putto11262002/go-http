@@ -30,11 +30,14 @@ func NewBookApi() *BookApi {
 }
 
 func (api *BookApi) handleGetBooks(w http.ResponseWriter, r *http.Request) {
-
+	api.logger.Info("retrieving books")
+	start := time.Now()
 	books := api.storage.GetBooks()
+	api.logger.Info("retrieving books took: %v seconds", time.Since(start).Seconds())
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(books)
+
 
 }
 
@@ -124,6 +127,7 @@ func (api *BookApi) Run() {
 
 	defer func() {
 		api.logger.Info("cleaning up extra resources")
+		// api.logger.Close()
 		cancel()
 	}()
 

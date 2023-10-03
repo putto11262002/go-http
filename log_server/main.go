@@ -1,9 +1,10 @@
 package logserver
 
 import (
-	"fmt"
+	"bufio"
 	"log"
 	"net"
+	"os"
 	"time"
 )
 
@@ -37,23 +38,52 @@ func (logServer *LogServer) Run(){
 		}
 
 		go func (conn net.Conn)  {
-			defer func ()  {
-				log.Printf("%s disconnected", conn.RemoteAddr())
-				 conn.Close()
-			}()
+			// Set read deadline to 24 hours
 			conn.SetReadDeadline(time.Now().Add(time.Hour * 24))
+
+			file, err := os.OpenFile("app.log", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+			if err != nil {
+				log.Printf("error opening log file: %v", err)
+				return 
+			}
+
+			writer := bufio.NewWriter(file)
+			reader := bufio.NewReader(conn)
 			
-			log.Printf("%s connected", conn.RemoteAddr())
-			buffer := make([]byte, 1024)
+
+			defer func ()  {
+				
+				writer.Flush()
+				 file.Close()
+				 conn.Close()
+				 log.Printf("%s disconnected", conn.RemoteAddr())
+			}()
+
+		
+			
 			for {
-				n, err := conn.Read(buffer)
+				var conClose bool
+				incoming, err := reader.ReadBytes('\n')
+				
 				if err != nil {
+					// if err == io.EOF {
+					// 	conClose = true
+					// }
 					log.Printf("Error reading from %s", conn.RemoteAddr())
-					return
+					conClose = true
 				}
 
-				logMessage := string(buffer[:n])
-				fmt.Printf("%s: %s", conn.RemoteAddr(), logMessage)
+				
+
+				_, err = writer.Write(incoming)
+				if err != nil {
+					log.Fatalf("error writing to log file: %v\n", err)
+				}
+
+				if conClose {
+					break
+				}
+
 			}
 			
 		}(con)
